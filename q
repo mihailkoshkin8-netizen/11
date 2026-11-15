@@ -1,7 +1,7 @@
 -- ============================================================
 --  Visuals + ESP (Mobile optimized)
 --  ESP: Name, Distance, Health, BOX (outline)
---  Features: Fullbright, Remove Fog, Remove Grass
+--  Features: Fullbright, Remove Fog, Remove Grass (only grass)
 --  No console output
 -- ============================================================
 
@@ -15,7 +15,7 @@ local LocalPlayer = Players.LocalPlayer
 --  GUI (крупный, под телефоны)
 -- ============================================================
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "VisualsMenu"
+ScreenGui.Name = ""
 ScreenGui.ResetOnSpawn = false
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -27,7 +27,6 @@ if not ScreenGui.Parent then
     ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 end
 
--- Основная рамка (крупнее для тача)
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 270, 0, 300)
 MainFrame.Position = UDim2.new(0, 15, 0, 15)
@@ -35,21 +34,20 @@ MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
+MainFrame.ClipsDescendants = true   -- ВАЖНО: чтобы кнопки прятались при сворачивании
 MainFrame.Parent = ScreenGui
 
 local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 10)
 UICorner.Parent = MainFrame
 
--- Заголовок (тап = свернуть/развернуть)
+-- Заголовок (пустой, тап = свернуть/развернуть)
 local Title = Instance.new("TextButton")
 Title.Size = UDim2.new(1, 0, 0, 50)
 Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 Title.BorderSizePixel = 0
-Title.Text = "Visuals Menu  ▲"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 19
+Title.Text = ""                    -- пустая шапка
+Title.AutoButtonColor = false
 Title.Parent = MainFrame
 
 local TitleCorner = Instance.new("UICorner")
@@ -60,7 +58,6 @@ local collapsed = false
 Title.MouseButton1Click:Connect(function()
     collapsed = not collapsed
     MainFrame.Size = collapsed and UDim2.new(0, 270, 0, 50) or UDim2.new(0, 270, 0, 300)
-    Title.Text = collapsed and "Visuals Menu  ▼" or "Visuals Menu  ▲"
 end)
 
 -- ============================================================
@@ -126,10 +123,38 @@ createActionButton("Remove Fog", 166, function()
     end)
 end)
 
+-- Удаление ТОЛЬКО травы (Grass -> Ground), земля остаётся
 createActionButton("Remove Grass", 220, function()
     pcall(function()
-        if Terrain then
-            Terrain:Clear()
+        local terrain = workspace:FindFirstChildOfClass("Terrain")
+        if not terrain then return end
+
+        local ok, size = pcall(function() return terrain:GetExtentsSize() end)
+        if not ok or not size then
+            size = Vector3.new(4096, 1024, 4096)
+        end
+
+        local halfX = math.ceil(size.X / 2) + 64
+        local halfY = math.ceil(size.Y / 2) + 64
+        local halfZ = math.ceil(size.Z / 2) + 64
+        local chunk = 512
+
+        local x = -halfX
+        while x < halfX do
+            local z = -halfZ
+            while z < halfZ do
+                local region = Region3.new(
+                    Vector3.new(x, -halfY, z),
+                    Vector3.new(math.min(x + chunk, halfX), halfY, math.min(z + chunk, halfZ))
+                )
+                pcall(function()
+                    terrain:ReplaceMaterial(region, 4, Enum.Material.Grass, Enum.Material.Ground)
+                end)
+                z = z + chunk
+                task.wait(0.01)
+            end
+            x = x + chunk
+            task.wait(0.01)
         end
     end)
 end)
@@ -149,7 +174,7 @@ local function applyFullbright()
 end
 
 -- ============================================================
---  ESP + BOX (обводка)
+--  ESP + BOX
 -- ============================================================
 local espObjects = {}
 
@@ -157,7 +182,7 @@ local function createESP(player)
     if player == LocalPlayer then return end
     if espObjects[player] then return end
 
-    -- === Инфо-билборд (ник / метры / хп) ===
+    -- Инфо
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "ESP_Info_" .. player.Name
     billboard.Size = UDim2.new(0, 220, 0, 70)
@@ -199,10 +224,9 @@ local function createESP(player)
     healthLabel.TextStrokeTransparency = 0
     healthLabel.Parent = billboard
 
-    -- === Бокс (обводка тела) ===
+    -- Бокс
     local boxBillboard = Instance.new("BillboardGui")
     boxBillboard.Name = "ESP_Box_" .. player.Name
-    -- Размер в СТУДАХ — сам масштабируется с дистанцией
     boxBillboard.Size = UDim2.new(2.5, 0, 5.5, 0)
     boxBillboard.AlwaysOnTop = true
     boxBillboard.ResetOnSpawn = false
@@ -216,12 +240,11 @@ local function createESP(player)
     boxFrame.Parent = boxBillboard
 
     local boxStroke = Instance.new("UIStroke")
-    boxStroke.Thickness = 2.5          -- пиксели — видно и на телефоне вдалеке
+    boxStroke.Thickness = 2.5
     boxStroke.Color = Color3.fromRGB(0, 255, 0)
     boxStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     boxStroke.Parent = boxFrame
 
-    -- === Крепление ===
     local char = player.Character
     if char then
         local head = char:FindFirstChild("Head")
@@ -239,7 +262,6 @@ local function createESP(player)
         boxStroke    = boxStroke,
     }
 
-    -- респавн — перевесить
     player.CharacterAdded:Connect(function(newChar)
         local head = newChar:WaitForChild("Head", 5)
         local hrp  = newChar:WaitForChild("HumanoidRootPart", 5)
@@ -295,13 +317,11 @@ RunService.Heartbeat:Connect(function()
 
         local humanoid = char:FindFirstChildOfClass("Humanoid")
 
-        -- HP
         if humanoid then
             local curHP = math.floor(humanoid.Health)
             local maxHP = math.floor(humanoid.MaxHealth)
             data.healthLabel.Text = string.format("HP: %d/%d", curHP, maxHP)
 
-            -- цвет бокса по здоровью
             local ratio = (maxHP > 0) and (curHP / maxHP) or 1
             if ratio > 0.6 then
                 data.boxStroke.Color = Color3.fromRGB(0, 255, 0)
@@ -312,14 +332,12 @@ RunService.Heartbeat:Connect(function()
             end
         end
 
-        -- дистанция
         if myRoot then
             local dist = (myRoot.Position - head.Position).Magnitude
             data.distLabel.Text = string.format("%d m", math.floor(dist))
         end
     end
 
-    -- новые игроки
     if espOn then
         for _, player in pairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and not espObjects[player] then
