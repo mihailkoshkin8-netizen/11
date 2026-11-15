@@ -1,7 +1,8 @@
 -- ============================================================
---  Universal Visuals + ESP (no console output)
---  Features: ESP (Name, Distance, Health), Fullbright,
---            Remove Fog, Remove Grass
+--  Visuals + ESP (Mobile optimized)
+--  ESP: Name, Distance, Health, BOX (outline)
+--  Features: Fullbright, Remove Fog, Remove Grass
+--  No console output
 -- ============================================================
 
 local Players = game:GetService("Players")
@@ -11,7 +12,7 @@ local Terrain = workspace:FindFirstChildOfClass("Terrain")
 local LocalPlayer = Players.LocalPlayer
 
 -- ============================================================
---  GUI
+--  GUI (крупный, под телефоны)
 -- ============================================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "VisualsMenu"
@@ -26,10 +27,10 @@ if not ScreenGui.Parent then
     ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 end
 
+-- Основная рамка (крупнее для тача)
 local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 220, 0, 260)
-MainFrame.Position = UDim2.new(0, 20, 0, 20)
+MainFrame.Size = UDim2.new(0, 270, 0, 300)
+MainFrame.Position = UDim2.new(0, 15, 0, 15)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
@@ -37,77 +38,82 @@ MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 
 local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.CornerRadius = UDim.new(0, 10)
 UICorner.Parent = MainFrame
 
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 35)
+-- Заголовок (тап = свернуть/развернуть)
+local Title = Instance.new("TextButton")
+Title.Size = UDim2.new(1, 0, 0, 50)
 Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 Title.BorderSizePixel = 0
-Title.Text = "Visuals Menu"
+Title.Text = "Visuals Menu  ▲"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 16
+Title.TextSize = 19
 Title.Parent = MainFrame
 
 local TitleCorner = Instance.new("UICorner")
-TitleCorner.CornerRadius = UDim.new(0, 8)
+TitleCorner.CornerRadius = UDim.new(0, 10)
 TitleCorner.Parent = Title
 
+local collapsed = false
+Title.MouseButton1Click:Connect(function()
+    collapsed = not collapsed
+    MainFrame.Size = collapsed and UDim2.new(0, 270, 0, 50) or UDim2.new(0, 270, 0, 300)
+    Title.Text = collapsed and "Visuals Menu  ▼" or "Visuals Menu  ▲"
+end)
+
 -- ============================================================
---  Toggle buttons
+--  Кнопки (увеличенные, тач-френдли)
 -- ============================================================
 local function createToggle(name, yPos)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 200, 0, 30)
+    btn.Size = UDim2.new(0, 250, 0, 46)
     btn.Position = UDim2.new(0, 10, 0, yPos)
     btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     btn.BorderSizePixel = 0
     btn.Text = name .. ": OFF"
     btn.TextColor3 = Color3.fromRGB(200, 200, 200)
-    btn.Font = Enum.Font.Gotham
-    btn.TextSize = 13
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 15
     btn.Parent = MainFrame
 
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
+    corner.CornerRadius = UDim.new(0, 8)
     corner.Parent = btn
 
     local state = false
     btn.MouseButton1Click:Connect(function()
         state = not state
         btn.Text = name .. ": " .. (state and "ON" or "OFF")
-        btn.BackgroundColor3 = state and Color3.fromRGB(0, 120, 60) or Color3.fromRGB(40, 40, 40)
+        btn.BackgroundColor3 = state and Color3.fromRGB(0, 130, 60) or Color3.fromRGB(40, 40, 40)
     end)
     return btn, function() return state end
 end
 
-local espBtn, getEspState = createToggle("ESP", 45)
-local fbBtn, getFbState = createToggle("Fullbright", 80)
+local espBtn, getEspState = createToggle("ESP", 58)
+local fbBtn, getFbState = createToggle("Fullbright", 112)
 
--- ============================================================
---  Action buttons
--- ============================================================
 local function createActionButton(name, yPos, callback)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 200, 0, 30)
+    btn.Size = UDim2.new(0, 250, 0, 46)
     btn.Position = UDim2.new(0, 10, 0, yPos)
-    btn.BackgroundColor3 = Color3.fromRGB(60, 30, 30)
+    btn.BackgroundColor3 = Color3.fromRGB(65, 30, 30)
     btn.BorderSizePixel = 0
     btn.Text = name
     btn.TextColor3 = Color3.fromRGB(255, 220, 220)
-    btn.Font = Enum.Font.Gotham
-    btn.TextSize = 13
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 15
     btn.Parent = MainFrame
 
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
+    corner.CornerRadius = UDim.new(0, 8)
     corner.Parent = btn
 
     btn.MouseButton1Click:Connect(callback)
 end
 
-createActionButton("Remove Fog", 115, function()
+createActionButton("Remove Fog", 166, function()
     pcall(function()
         Lighting.FogEnd = 100000
         Lighting.FogStart = 0
@@ -120,7 +126,7 @@ createActionButton("Remove Fog", 115, function()
     end)
 end)
 
-createActionButton("Remove Grass", 150, function()
+createActionButton("Remove Grass", 220, function()
     pcall(function()
         if Terrain then
             Terrain:Clear()
@@ -143,95 +149,130 @@ local function applyFullbright()
 end
 
 -- ============================================================
---  ESP
+--  ESP + BOX (обводка)
 -- ============================================================
-local espObjects = {} -- [player] = { billboard = ..., nameLabel, distLabel, healthLabel }
+local espObjects = {}
 
 local function createESP(player)
     if player == LocalPlayer then return end
     if espObjects[player] then return end
 
+    -- === Инфо-билборд (ник / метры / хп) ===
     local billboard = Instance.new("BillboardGui")
-    billboard.Name = "ESP_" .. player.Name
-    billboard.Size = UDim2.new(0, 200, 0, 60)
+    billboard.Name = "ESP_Info_" .. player.Name
+    billboard.Size = UDim2.new(0, 220, 0, 70)
     billboard.StudsOffset = Vector3.new(0, 3, 0)
     billboard.AlwaysOnTop = true
     billboard.ResetOnSpawn = false
+    billboard.LightInfluence = 0
     billboard.Enabled = false
 
     local nameLabel = Instance.new("TextLabel")
-    nameLabel.Size = UDim2.new(1, 0, 0, 20)
+    nameLabel.Size = UDim2.new(1, 0, 0, 22)
     nameLabel.BackgroundTransparency = 1
     nameLabel.Text = player.Name
     nameLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
     nameLabel.Font = Enum.Font.GothamBold
-    nameLabel.TextSize = 14
+    nameLabel.TextSize = 16
     nameLabel.TextStrokeTransparency = 0
     nameLabel.Parent = billboard
 
     local distLabel = Instance.new("TextLabel")
-    distLabel.Size = UDim2.new(1, 0, 0, 18)
-    distLabel.Position = UDim2.new(0, 0, 0, 20)
+    distLabel.Size = UDim2.new(1, 0, 0, 20)
+    distLabel.Position = UDim2.new(0, 0, 0, 22)
     distLabel.BackgroundTransparency = 1
     distLabel.Text = "0 m"
     distLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    distLabel.Font = Enum.Font.Gotham
-    distLabel.TextSize = 12
+    distLabel.Font = Enum.Font.GothamBold
+    distLabel.TextSize = 14
     distLabel.TextStrokeTransparency = 0
     distLabel.Parent = billboard
 
     local healthLabel = Instance.new("TextLabel")
-    healthLabel.Size = UDim2.new(1, 0, 0, 18)
-    healthLabel.Position = UDim2.new(0, 0, 0, 38)
+    healthLabel.Size = UDim2.new(1, 0, 0, 20)
+    healthLabel.Position = UDim2.new(0, 0, 0, 44)
     healthLabel.BackgroundTransparency = 1
     healthLabel.Text = "HP: 100/100"
     healthLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-    healthLabel.Font = Enum.Font.Gotham
-    healthLabel.TextSize = 12
+    healthLabel.Font = Enum.Font.GothamBold
+    healthLabel.TextSize = 14
     healthLabel.TextStrokeTransparency = 0
     healthLabel.Parent = billboard
 
-    espObjects[player] = {
-        billboard = billboard,
-        nameLabel = nameLabel,
-        distLabel = distLabel,
-        healthLabel = healthLabel,
-    }
+    -- === Бокс (обводка тела) ===
+    local boxBillboard = Instance.new("BillboardGui")
+    boxBillboard.Name = "ESP_Box_" .. player.Name
+    -- Размер в СТУДАХ — сам масштабируется с дистанцией
+    boxBillboard.Size = UDim2.new(2.5, 0, 5.5, 0)
+    boxBillboard.AlwaysOnTop = true
+    boxBillboard.ResetOnSpawn = false
+    boxBillboard.LightInfluence = 0
+    boxBillboard.Enabled = false
 
+    local boxFrame = Instance.new("Frame")
+    boxFrame.Size = UDim2.new(1, 0, 1, 0)
+    boxFrame.BackgroundTransparency = 1
+    boxFrame.BorderSizePixel = 0
+    boxFrame.Parent = boxBillboard
+
+    local boxStroke = Instance.new("UIStroke")
+    boxStroke.Thickness = 2.5          -- пиксели — видно и на телефоне вдалеке
+    boxStroke.Color = Color3.fromRGB(0, 255, 0)
+    boxStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    boxStroke.Parent = boxFrame
+
+    -- === Крепление ===
     local char = player.Character
-    if char and char:FindFirstChild("Head") then
-        billboard.Parent = char.Head
-    else
-        billboard.Parent = ScreenGui
+    if char then
+        local head = char:FindFirstChild("Head")
+        local hrp  = char:FindFirstChild("HumanoidRootPart")
+        if head then billboard.Parent = head end
+        if hrp then boxBillboard.Adornee = hrp; boxBillboard.Parent = hrp end
     end
 
+    espObjects[player] = {
+        billboard    = billboard,
+        boxBillboard = boxBillboard,
+        nameLabel    = nameLabel,
+        distLabel    = distLabel,
+        healthLabel  = healthLabel,
+        boxStroke    = boxStroke,
+    }
+
+    -- респавн — перевесить
     player.CharacterAdded:Connect(function(newChar)
         local head = newChar:WaitForChild("Head", 5)
-        if head then
-            billboard.Parent = head
+        local hrp  = newChar:WaitForChild("HumanoidRootPart", 5)
+        if head then billboard.Parent = head else billboard.Parent = ScreenGui end
+        if hrp then
+            boxBillboard.Adornee = hrp
+            boxBillboard.Parent = hrp
+        else
+            boxBillboard.Parent = ScreenGui
         end
     end)
 end
 
 local function removeESP(player)
     if espObjects[player] then
-        espObjects[player].billboard:Destroy()
+        if espObjects[player].billboard then espObjects[player].billboard:Destroy() end
+        if espObjects[player].boxBillboard then espObjects[player].boxBillboard:Destroy() end
         espObjects[player] = nil
     end
 end
 
 -- ============================================================
---  ESP update loop
+--  Обновление
 -- ============================================================
 RunService.Heartbeat:Connect(function()
     local espOn = getEspState()
     local fbOn = getFbState()
 
-    if fbOn then
-        applyFullbright()
-    end
+    if fbOn then applyFullbright() end
 
-    -- ESP
+    local myChar = LocalPlayer.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+
     for player, data in pairs(espObjects) do
         if not player.Parent then
             removeESP(player)
@@ -240,28 +281,45 @@ RunService.Heartbeat:Connect(function()
 
         local char = player.Character
         local head = char and char:FindFirstChild("Head")
-        if not head then
+        local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+
+        if not head or not hrp then
             data.billboard.Enabled = false
+            data.boxBillboard.Enabled = false
             continue
         end
 
         data.billboard.Enabled = espOn
+        data.boxBillboard.Enabled = espOn
         if not espOn then continue end
 
         local humanoid = char:FindFirstChildOfClass("Humanoid")
+
+        -- HP
         if humanoid then
-            data.healthLabel.Text = string.format("HP: %d/%d", math.floor(humanoid.Health), math.floor(humanoid.MaxHealth))
+            local curHP = math.floor(humanoid.Health)
+            local maxHP = math.floor(humanoid.MaxHealth)
+            data.healthLabel.Text = string.format("HP: %d/%d", curHP, maxHP)
+
+            -- цвет бокса по здоровью
+            local ratio = (maxHP > 0) and (curHP / maxHP) or 1
+            if ratio > 0.6 then
+                data.boxStroke.Color = Color3.fromRGB(0, 255, 0)
+            elseif ratio > 0.3 then
+                data.boxStroke.Color = Color3.fromRGB(255, 220, 0)
+            else
+                data.boxStroke.Color = Color3.fromRGB(255, 50, 50)
+            end
         end
 
-        local myChar = LocalPlayer.Character
-        local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        -- дистанция
         if myRoot then
             local dist = (myRoot.Position - head.Position).Magnitude
             data.distLabel.Text = string.format("%d m", math.floor(dist))
         end
     end
 
-    -- add ESP for new players if enabled
+    -- новые игроки
     if espOn then
         for _, player in pairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and not espObjects[player] then
@@ -271,20 +329,14 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- player events
 Players.PlayerAdded:Connect(function(player)
-    if getEspState() then
-        createESP(player)
-    end
+    if getEspState() then createESP(player) end
 end)
 
 Players.PlayerRemoving:Connect(function(player)
     removeESP(player)
 end)
 
--- initial ESP creation
 for _, player in pairs(Players:GetPlayers()) do
-    if player ~= LocalPlayer then
-        createESP(player)
-    end
+    if player ~= LocalPlayer then createESP(player) end
 end
