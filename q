@@ -1,31 +1,77 @@
 -- ============================================================
---  Visuals + ESP (Mobile optimized)
+--  Visuals + ESP (Mobile optimized, hardened, self-healing)
 --  ESP: Name, Distance, Health, BOX (outline)
---  Features: Fullbright, Remove Fog, Remove Grass (only grass)
+--  Features: Fullbright, Remove Fog, Remove Grass Decor
+--  Auto-cleanup of previous version
 --  No console output
 -- ============================================================
 
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
 local RunService = game:GetService("RunService")
-local Terrain = workspace:FindFirstChildOfClass("Terrain")
+local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 
 -- ============================================================
---  GUI (крупный, под телефоны)
+--  AUTO-CLEANUP предыдущей версии
+-- ============================================================
+if type(_G.__visuals_cleanup) == "function" then
+    pcall(_G.__visuals_cleanup)
+end
+
+local cleanupInstances = {}
+local cleanupConnections = {}
+
+local function track(inst)
+    table.insert(cleanupInstances, inst)
+    return inst
+end
+local function trackConn(conn)
+    table.insert(cleanupConnections, conn)
+    return conn
+end
+
+_G.__visuals_cleanup = function()
+    for _, c in pairs(cleanupConnections) do
+        pcall(function() c:Disconnect() end)
+    end
+    cleanupConnections = {}
+    for _, i in pairs(cleanupInstances) do
+        pcall(function() i:Destroy() end)
+    end
+    cleanupInstances = {}
+end
+
+-- добиваем остатки от прежних запусков (если _G потерялся)
+do
+    local function nukeIn(parent)
+        for _, obj in pairs(parent:GetChildren()) do
+            if obj:GetAttribute("__visuals_menu") or obj:GetAttribute("__visuals_esp") then
+                pcall(function() obj:Destroy() end)
+            end
+        end
+    end
+    pcall(nukeIn, CoreGui)
+    pcall(nukeIn, LocalPlayer:WaitForChild("PlayerGui"))
+end
+
+-- ============================================================
+--  GUI
 -- ============================================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = ""
 ScreenGui.ResetOnSpawn = false
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui:SetAttribute("__visuals_menu", true)
 pcall(function()
     if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end
-    ScreenGui.Parent = game:GetService("CoreGui")
+    ScreenGui.Parent = CoreGui
 end)
 if not ScreenGui.Parent then
     ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 end
+track(ScreenGui)
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 270, 0, 300)
@@ -34,34 +80,57 @@ MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
-MainFrame.ClipsDescendants = true   -- ВАЖНО: чтобы кнопки прятались при сворачивании
+MainFrame.ClipsDescendants = true
 MainFrame.Parent = ScreenGui
+track(MainFrame)
 
 local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 10)
 UICorner.Parent = MainFrame
 
--- Заголовок (пустой, тап = свернуть/развернуть)
-local Title = Instance.new("TextButton")
-Title.Size = UDim2.new(1, 0, 0, 50)
-Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-Title.BorderSizePixel = 0
-Title.Text = ""                    -- пустая шапка
-Title.AutoButtonColor = false
-Title.Parent = MainFrame
+-- Шапка
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 50)
+TitleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+TitleBar.BorderSizePixel = 0
+TitleBar.Active = true
+TitleBar.Parent = MainFrame
+track(TitleBar)
 
 local TitleCorner = Instance.new("UICorner")
 TitleCorner.CornerRadius = UDim.new(0, 10)
-TitleCorner.Parent = Title
+TitleCorner.Parent = TitleBar
+
+-- ВИДИМАЯ кнопка сворачивания
+local CollapseBtn = Instance.new("TextButton")
+CollapseBtn.Size = UDim2.new(0, 40, 0, 40)
+CollapseBtn.Position = UDim2.new(1, -45, 0, 5)
+CollapseBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+CollapseBtn.BorderSizePixel = 0
+CollapseBtn.Text = "▼"
+CollapseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CollapseBtn.Font = Enum.Font.GothamBold
+CollapseBtn.TextSize = 22
+CollapseBtn.Parent = TitleBar
+track(CollapseBtn)
+
+local CollapseCorner = Instance.new("UICorner")
+CollapseCorner.CornerRadius = UDim.new(0, 8)
+CollapseCorner.Parent = CollapseBtn
 
 local collapsed = false
-Title.MouseButton1Click:Connect(function()
-    collapsed = not collapsed
+local function setCollapsed(state)
+    collapsed = state
     MainFrame.Size = collapsed and UDim2.new(0, 270, 0, 50) or UDim2.new(0, 270, 0, 300)
+    CollapseBtn.Text = collapsed and "▲" or "▼"
+end
+
+CollapseBtn.MouseButton1Click:Connect(function()
+    setCollapsed(not collapsed)
 end)
 
 -- ============================================================
---  Кнопки (увеличенные, тач-френдли)
+--  Кнопки
 -- ============================================================
 local function createToggle(name, yPos)
     local btn = Instance.new("TextButton")
@@ -74,6 +143,7 @@ local function createToggle(name, yPos)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 15
     btn.Parent = MainFrame
+    track(btn)
 
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 8)
@@ -102,6 +172,7 @@ local function createActionButton(name, yPos, callback)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 15
     btn.Parent = MainFrame
+    track(btn)
 
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 8)
@@ -123,38 +194,11 @@ createActionButton("Remove Fog", 166, function()
     end)
 end)
 
--- Удаление ТОЛЬКО травы (Grass -> Ground), земля остаётся
 createActionButton("Remove Grass", 220, function()
     pcall(function()
         local terrain = workspace:FindFirstChildOfClass("Terrain")
-        if not terrain then return end
-
-        local ok, size = pcall(function() return terrain:GetExtentsSize() end)
-        if not ok or not size then
-            size = Vector3.new(4096, 1024, 4096)
-        end
-
-        local halfX = math.ceil(size.X / 2) + 64
-        local halfY = math.ceil(size.Y / 2) + 64
-        local halfZ = math.ceil(size.Z / 2) + 64
-        local chunk = 512
-
-        local x = -halfX
-        while x < halfX do
-            local z = -halfZ
-            while z < halfZ do
-                local region = Region3.new(
-                    Vector3.new(x, -halfY, z),
-                    Vector3.new(math.min(x + chunk, halfX), halfY, math.min(z + chunk, halfZ))
-                )
-                pcall(function()
-                    terrain:ReplaceMaterial(region, 4, Enum.Material.Grass, Enum.Material.Ground)
-                end)
-                z = z + chunk
-                task.wait(0.01)
-            end
-            x = x + chunk
-            task.wait(0.01)
+        if terrain then
+            terrain.Decoration = false
         end
     end)
 end)
@@ -174,9 +218,44 @@ local function applyFullbright()
 end
 
 -- ============================================================
---  ESP + BOX
+--  ESP + BOX (self-healing)
 -- ============================================================
 local espObjects = {}
+
+local function attachToChar(data, char)
+    if not char or not data or not data.billboard or not data.billboard.Parent then return end
+    local head = char:FindFirstChild("Head")
+    local hrp  = char:FindFirstChild("HumanoidRootPart")
+    local on   = getEspState()
+
+    if head then
+        data.billboard.Adornee = head
+        data.billboard.Enabled = on
+    else
+        data.billboard.Adornee = nil
+        data.billboard.Enabled = false
+    end
+
+    if hrp then
+        data.boxBillboard.Adornee = hrp
+        data.boxBillboard.Enabled = on
+    else
+        data.boxBillboard.Adornee = nil
+        data.boxBillboard.Enabled = false
+    end
+end
+
+local function detachChar(data)
+    if not data then return end
+    if data.billboard and data.billboard.Parent then
+        data.billboard.Adornee = nil
+        data.billboard.Enabled = false
+    end
+    if data.boxBillboard and data.boxBillboard.Parent then
+        data.boxBillboard.Adornee = nil
+        data.boxBillboard.Enabled = false
+    end
+end
 
 local function createESP(player)
     if player == LocalPlayer then return end
@@ -190,7 +269,11 @@ local function createESP(player)
     billboard.AlwaysOnTop = true
     billboard.ResetOnSpawn = false
     billboard.LightInfluence = 0
+    billboard.MaxDistance = 0
     billboard.Enabled = false
+    billboard:SetAttribute("__visuals_esp", true)
+    billboard.Parent = ScreenGui
+    track(billboard)
 
     local nameLabel = Instance.new("TextLabel")
     nameLabel.Size = UDim2.new(1, 0, 0, 22)
@@ -231,7 +314,11 @@ local function createESP(player)
     boxBillboard.AlwaysOnTop = true
     boxBillboard.ResetOnSpawn = false
     boxBillboard.LightInfluence = 0
+    boxBillboard.MaxDistance = 0
     boxBillboard.Enabled = false
+    boxBillboard:SetAttribute("__visuals_esp", true)
+    boxBillboard.Parent = ScreenGui
+    track(boxBillboard)
 
     local boxFrame = Instance.new("Frame")
     boxFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -245,46 +332,70 @@ local function createESP(player)
     boxStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     boxStroke.Parent = boxFrame
 
-    local char = player.Character
-    if char then
-        local head = char:FindFirstChild("Head")
-        local hrp  = char:FindFirstChild("HumanoidRootPart")
-        if head then billboard.Parent = head end
-        if hrp then boxBillboard.Adornee = hrp; boxBillboard.Parent = hrp end
-    end
-
-    espObjects[player] = {
+    local data = {
         billboard    = billboard,
         boxBillboard = boxBillboard,
         nameLabel    = nameLabel,
         distLabel    = distLabel,
         healthLabel  = healthLabel,
         boxStroke    = boxStroke,
+        charAdded    = nil,
+        charRemoving = nil,
     }
+    espObjects[player] = data
 
-    player.CharacterAdded:Connect(function(newChar)
-        local head = newChar:WaitForChild("Head", 5)
-        local hrp  = newChar:WaitForChild("HumanoidRootPart", 5)
-        if head then billboard.Parent = head else billboard.Parent = ScreenGui end
-        if hrp then
-            boxBillboard.Adornee = hrp
-            boxBillboard.Parent = hrp
-        else
-            boxBillboard.Parent = ScreenGui
-        end
+    -- Мгновенная привязка при возрождении
+    data.charAdded = player.CharacterAdded:Connect(function(char)
+        task.spawn(function()
+            char:WaitForChild("Head", 5)
+            char:WaitForChild("HumanoidRootPart", 5)
+            attachToChar(data, char)
+        end)
     end)
-end
+    trackConn(data.charAdded)
 
-local function removeESP(player)
-    if espObjects[player] then
-        if espObjects[player].billboard then espObjects[player].billboard:Destroy() end
-        if espObjects[player].boxBillboard then espObjects[player].boxBillboard:Destroy() end
-        espObjects[player] = nil
+    -- Мгновенное скрытие при смерти
+    data.charRemoving = player.CharacterRemoving:Connect(function()
+        detachChar(data)
+    end)
+    trackConn(data.charRemoving)
+
+    -- Привязать к текущему персонажу (если уже есть)
+    if player.Character then
+        task.spawn(function()
+            local c = player.Character
+            if c then
+                c:WaitForChild("Head", 3)
+                c:WaitForChild("HumanoidRootPart", 3)
+                attachToChar(data, c)
+            end
+        end)
     end
 end
 
+local function removeESP(player)
+    local data = espObjects[player]
+    if not data then return end
+    if data.charAdded then pcall(function() data.charAdded:Disconnect() end) end
+    if data.charRemoving then pcall(function() data.charRemoving:Disconnect() end) end
+    if data.billboard then pcall(function() data.billboard:Destroy() end) end
+    if data.boxBillboard then pcall(function() data.boxBillboard:Destroy() end) end
+    espObjects[player] = nil
+end
+
 -- ============================================================
---  Обновление
+--  Быстрый путь: события игроков
+-- ============================================================
+Players.PlayerAdded:Connect(function(player)
+    if getEspState() then createESP(player) end
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    removeESP(player)
+end)
+
+-- ============================================================
+--  Heartbeat: полная сверка (страховка)
 -- ============================================================
 RunService.Heartbeat:Connect(function()
     local espOn = getEspState()
@@ -292,20 +403,48 @@ RunService.Heartbeat:Connect(function()
 
     if fbOn then applyFullbright() end
 
+    -- Строим текущий набор игроков
+    local present = {}
+    for _, p in pairs(Players:GetPlayers()) do
+        present[p] = true
+    end
+
+    -- 1) Удаляем ESP для ушедших / разрушенных
+    for player, data in pairs(espObjects) do
+        if not present[player] or not player.Parent then
+            removeESP(player)
+        elseif not data.billboard.Parent or not data.boxBillboard.Parent then
+            -- билборд уничтожен — пересоздаём
+            removeESP(player)
+            if espOn then createESP(player) end
+        end
+    end
+
+    -- 2) Создаём ESP для новых, если ESP включён
+    if espOn then
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and not espObjects[player] then
+                createESP(player)
+            end
+        end
+    end
+
+    -- 3) Обновляем состояние всех ESP
     local myChar = LocalPlayer.Character
     local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
 
     for player, data in pairs(espObjects) do
-        if not player.Parent then
-            removeESP(player)
-            continue
-        end
-
         local char = player.Character
         local head = char and char:FindFirstChild("Head")
         local hrp  = char and char:FindFirstChild("HumanoidRootPart")
 
-        if not head or not hrp then
+        -- всегда переустанавливаем Adornee (страховка от сброса)
+        if head then data.billboard.Adornee = head
+        else data.billboard.Adornee = nil end
+        if hrp then data.boxBillboard.Adornee = hrp
+        else data.boxBillboard.Adornee = nil end
+
+        if not (head and hrp) then
             data.billboard.Enabled = false
             data.boxBillboard.Enabled = false
             continue
@@ -316,7 +455,6 @@ RunService.Heartbeat:Connect(function()
         if not espOn then continue end
 
         local humanoid = char:FindFirstChildOfClass("Humanoid")
-
         if humanoid then
             local curHP = math.floor(humanoid.Health)
             local maxHP = math.floor(humanoid.MaxHealth)
@@ -337,24 +475,11 @@ RunService.Heartbeat:Connect(function()
             data.distLabel.Text = string.format("%d m", math.floor(dist))
         end
     end
-
-    if espOn then
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and not espObjects[player] then
-                createESP(player)
-            end
-        end
-    end
 end)
 
-Players.PlayerAdded:Connect(function(player)
-    if getEspState() then createESP(player) end
-end)
-
-Players.PlayerRemoving:Connect(function(player)
-    removeESP(player)
-end)
-
+-- ============================================================
+--  Начальная инициализация
+-- ============================================================
 for _, player in pairs(Players:GetPlayers()) do
     if player ~= LocalPlayer then createESP(player) end
 end
